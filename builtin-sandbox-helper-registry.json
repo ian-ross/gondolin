@@ -1,5 +1,27 @@
 {
   "schema": 1,
-  "refs": {},
-  "builds": {}
+  "refs": {
+    "gondolin:0.9.0": {
+      "aarch64": "003eed58-6f85-5d05-a727-3b24dcff04fb",
+      "x86_64": "7aafe4da-2d0f-5288-9fca-79b2411cbce8"
+    }
+  },
+  "builds": {
+    "003eed58-6f85-5d05-a727-3b24dcff04fb": {
+      "arch": "aarch64",
+      "gondolinVersion": "0.9.0",
+      "zigVersion": "0.16.0",
+      "target": "aarch64-linux-musl",
+      "url": "https://github.com/earendil-works/gondolin/releases/download/sandbox-helpers--0.9.0/gondolin-sandbox-helpers-0.9.0-aarch64.tar.gz",
+      "sha256": "9f8d895a38ac39ad5609d22a18cb24ada02903baa458d1f17ef9283e666bf76b"
+    },
+    "7aafe4da-2d0f-5288-9fca-79b2411cbce8": {
+      "arch": "x86_64",
+      "gondolinVersion": "0.9.0",
+      "zigVersion": "0.16.0",
+      "target": "x86_64-linux-musl",
+      "url": "https://github.com/earendil-works/gondolin/releases/download/sandbox-helpers--0.9.0/gondolin-sandbox-helpers-0.9.0-x86_64.tar.gz",
+      "sha256": "1bf91a39d7d940eb76251ffe277ec7908db767b57153dbc994fcff32d24eeb61"
+    }
+  }
 }
