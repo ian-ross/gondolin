@@ -4,7 +4,11 @@ All notable changes to Gondolin are documented here.
 
 ## Unreleased
 
+## 0.9.1
+
 - Replace deprecated `UV_NATIVE_TLS` with `UV_SYSTEM_CERTS` in guest init environments #98
+- Replace the workflow Zig setup action with a checked-in installer for more reliable CI/release builds #102
+- Update the built-in sandbox helper registry with the `gondolin:0.9.0` helper bundles
 
 ## 0.9.0
 
