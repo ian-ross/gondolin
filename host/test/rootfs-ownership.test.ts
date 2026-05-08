@@ -16,6 +16,41 @@ function writeStubCommand(binDir: string, name: string, body: string): string {
   return commandPath;
 }
 
+function writeMke2fsStub(binDir: string): string {
+  return writeStubCommand(binDir, "mke2fs", writeMke2fsStubBody());
+}
+
+function writeMke2fsStubBody(): string {
+  return [
+    'img=""',
+    'while [ "$#" -gt 0 ]; do',
+    '  if [ "$1" = "-F" ]; then',
+    "    shift",
+    '    img="${1:-}"',
+    "    break",
+    "  fi",
+    "  shift || true",
+    "done",
+    '[ -n "$img" ]',
+    ': > "$img"',
+  ].join("\n");
+}
+
+function captureDebugfsCommandFileScript(): string {
+  return [
+    'cmd_file=""',
+    'while [ "$#" -gt 0 ]; do',
+    '  if [ "$1" = "-f" ]; then',
+    "    shift",
+    '    cmd_file="${1:-}"',
+    "  fi",
+    "  shift || true",
+    "done",
+    '[ -n "$cmd_file" ]',
+    'cp "$cmd_file" "$DEBUGFS_LOG"',
+  ].join("\n");
+}
+
 test("rootfs image: applies OCI ownership metadata with debugfs for non-root builds", () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "gondolin-rootfs-owners-"));
   const binDir = path.join(tmp, "bin");
@@ -33,20 +68,7 @@ test("rootfs image: applies OCI ownership metadata with debugfs for non-root bui
   const mke2fsPath = writeStubCommand(
     binDir,
     "mke2fs",
-    [
-      'printf "%s\\n" "$*" > "$MKFS_LOG"',
-      'img=""',
-      'while [ "$#" -gt 0 ]; do',
-      '  if [ "$1" = "-F" ]; then',
-      '    shift',
-      '    img="${1:-}"',
-      '    break',
-      '  fi',
-      '  shift || true',
-      'done',
-      '[ -n "$img" ]',
-      ': > "$img"',
-    ].join("\n"),
+    ['printf "%s\\n" "$*" > "$MKFS_LOG"', writeMke2fsStubBody()].join("\n"),
   );
 
   writeStubCommand(
@@ -55,18 +77,9 @@ test("rootfs image: applies OCI ownership metadata with debugfs for non-root bui
     [
       'if [ "${1:-}" = "-V" ]; then',
       '  printf "debugfs fake 1.0\\n"',
-      '  exit 0',
-      'fi',
-      'cmd_file=""',
-      'while [ "$#" -gt 0 ]; do',
-      '  if [ "$1" = "-f" ]; then',
-      '    shift',
-      '    cmd_file="${1:-}"',
-      '  fi',
-      '  shift || true',
-      'done',
-      '[ -n "$cmd_file" ]',
-      'cp "$cmd_file" "$DEBUGFS_LOG"',
+      "  exit 0",
+      "fi",
+      captureDebugfsCommandFileScript(),
     ].join("\n"),
   );
 
@@ -120,6 +133,123 @@ test("rootfs image: applies OCI ownership metadata with debugfs for non-root bui
     } else {
       process.env.MKFS_LOG = oldMkfsLog;
     }
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("rootfs image: ignores large debugfs stdout while applying OCI ownership metadata", () => {
+  const tmp = fs.mkdtempSync(
+    path.join(os.tmpdir(), "gondolin-debugfs-stdout-"),
+  );
+  const binDir = path.join(tmp, "bin");
+  const rootfsDir = path.join(tmp, "rootfs");
+  const imagePath = path.join(tmp, "rootfs.ext4");
+  const debugfsLog = path.join(tmp, "debugfs-commands.txt");
+
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.mkdirSync(path.join(rootfsDir, "etc"), { recursive: true });
+  fs.writeFileSync(path.join(rootfsDir, "etc", "test"), "test\n");
+
+  const mke2fsPath = writeMke2fsStub(binDir);
+
+  writeStubCommand(
+    binDir,
+    "debugfs",
+    [
+      'if [ "${1:-}" = "-V" ]; then',
+      '  printf "debugfs fake 1.0\\n"',
+      "  exit 0",
+      "fi",
+      captureDebugfsCommandFileScript(),
+      `${JSON.stringify(process.execPath)} -e 'process.stdout.write("x".repeat(70 * 1024 * 1024))'`,
+    ].join("\n"),
+  );
+
+  const ownershipEntries: RootfsOwnershipEntry[] = [
+    { path: "etc/test", uid: 0, gid: 0 },
+  ];
+
+  const oldGetuid = process.getuid;
+  const oldDebugfsLog = process.env.DEBUGFS_LOG;
+
+  try {
+    process.getuid = () => 12345;
+    process.env.DEBUGFS_LOG = debugfsLog;
+
+    createRootfsImage(
+      mke2fsPath,
+      imagePath,
+      rootfsDir,
+      "gondolin-root",
+      16,
+      ownershipEntries,
+    );
+
+    assert.equal(fs.existsSync(imagePath), true);
+    const debugfsCommands = fs.readFileSync(debugfsLog, "utf8");
+    assert.match(debugfsCommands, /sif "\/etc\/test" uid 0/);
+    assert.match(debugfsCommands, /sif "\/etc\/test" gid 0/);
+  } finally {
+    process.getuid = oldGetuid;
+    if (oldDebugfsLog === undefined) {
+      delete process.env.DEBUGFS_LOG;
+    } else {
+      process.env.DEBUGFS_LOG = oldDebugfsLog;
+    }
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("rootfs image: includes debugfs stderr when ownership metadata fails", () => {
+  const tmp = fs.mkdtempSync(
+    path.join(os.tmpdir(), "gondolin-debugfs-stderr-"),
+  );
+  const binDir = path.join(tmp, "bin");
+  const rootfsDir = path.join(tmp, "rootfs");
+  const imagePath = path.join(tmp, "rootfs.ext4");
+
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.mkdirSync(path.join(rootfsDir, "etc"), { recursive: true });
+  fs.writeFileSync(path.join(rootfsDir, "etc", "test"), "test\n");
+
+  const mke2fsPath = writeMke2fsStub(binDir);
+
+  writeStubCommand(
+    binDir,
+    "debugfs",
+    [
+      'if [ "${1:-}" = "-V" ]; then',
+      '  printf "debugfs fake 1.0\\n"',
+      "  exit 0",
+      "fi",
+      'printf "debugfs ownership write failed\\n" >&2',
+      "exit 7",
+    ].join("\n"),
+  );
+
+  const ownershipEntries: RootfsOwnershipEntry[] = [
+    { path: "etc/test", uid: 0, gid: 0 },
+  ];
+
+  const oldGetuid = process.getuid;
+
+  try {
+    process.getuid = () => 12345;
+
+    assert.throws(
+      () =>
+        createRootfsImage(
+          mke2fsPath,
+          imagePath,
+          rootfsDir,
+          "gondolin-root",
+          16,
+          ownershipEntries,
+        ),
+      /debugfs ownership write failed/,
+    );
+  } finally {
+    process.getuid = oldGetuid;
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });

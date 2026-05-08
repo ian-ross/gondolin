@@ -279,7 +279,7 @@ function applyOwnershipMetadataToRootfsImage(
   try {
     fs.writeFileSync(cmdFile, `${commands.join("\n")}\n`);
     execFileSync(debugfs, ["-w", "-f", cmdFile, imagePath], {
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["ignore", "ignore", "pipe"],
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
     });
