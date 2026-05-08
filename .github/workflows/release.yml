@@ -162,16 +162,9 @@ jobs:
           ./node_modules/.bin/gondolin-krun-runner --version
 
       - name: Publish runner package (with provenance)
-        id: publish_runner
-        continue-on-error: true
         run: |
           cd "${{ matrix.package_dir }}"
           npm publish --access public --provenance
-
-      - name: Warn when runner package publish fails
-        if: steps.publish_runner.outcome != 'success'
-        run: |
-          echo "::warning::Runner package publish failed for ${{ matrix.package_name }}; continuing so main package release is not blocked"
 
   publish-npm:
     name: Publish main package to NPM
