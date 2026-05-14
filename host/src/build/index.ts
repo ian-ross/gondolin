@@ -62,9 +62,23 @@ export async function buildAssets(
     ? (msg: string) => process.stderr.write(`${msg}\n`)
     : () => {};
 
-  if (config.distro !== "alpine") {
+  if (config.distro === "debian" && !hasOciRootfs(config)) {
     throw new Error(
-      `Distro '${config.distro}' is not supported yet. Only 'alpine' builds are implemented.`,
+      "Distro 'debian' currently requires oci.image; native Debian rootfs builds are not implemented yet.",
+    );
+  }
+
+  if (config.distro === "debian" && config.alpine !== undefined) {
+    throw new Error("Distro 'debian' does not accept an alpine config block.");
+  }
+
+  if (config.distro === "debian" && config.nixos !== undefined) {
+    throw new Error("Distro 'debian' does not accept a nixos config block.");
+  }
+
+  if (config.distro !== "alpine" && config.distro !== "debian") {
+    throw new Error(
+      `Distro '${config.distro}' is not supported yet. Only 'alpine' and OCI-backed 'debian' builds are implemented.`,
     );
   }
 
@@ -90,11 +104,19 @@ export async function buildAssets(
   fs.mkdirSync(outputDir, { recursive: true });
 
   const rootfsSource = config.oci
-    ? `OCI image ${config.oci.image}`
+    ? config.distro === "debian"
+      ? `Debian OCI image ${config.oci.image}`
+      : `OCI image ${config.oci.image}`
     : "Alpine minirootfs";
+  const bootPipeline = config.oci
+    ? config.distro === "debian"
+      ? "Gondolin boot pipeline"
+      : "Alpine-derived Gondolin boot pipeline"
+    : "Alpine Gondolin boot pipeline";
 
   log(`Building guest assets for ${config.arch} (${config.distro})`);
   log(`Rootfs source: ${rootfsSource}`);
+  log(`Boot assets: ${bootPipeline}`);
   log(`Output directory: ${outputDir}`);
 
   if (shouldUseContainer(config)) {

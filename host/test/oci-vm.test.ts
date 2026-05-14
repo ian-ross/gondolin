@@ -56,10 +56,7 @@ const timeoutMs = Number(process.env.WS_TIMEOUT ?? 120000);
 function makeOciConfig(image: string): BuildConfig {
   return {
     arch: getDefaultArch(),
-    distro: "alpine",
-    alpine: {
-      version: "3.23.0",
-    },
+    distro: "debian",
     oci: {
       image,
       runtime: runtime ?? undefined,
@@ -95,6 +92,7 @@ test(
       },
     );
 
+    assert.equal(result.manifest.config.distro, "debian");
     assert.ok(
       result.manifest.ociSource,
       "expected oci source metadata in manifest",
@@ -141,6 +139,7 @@ test(
       },
     );
 
+    assert.equal(result.manifest.config.distro, "debian");
     assert.ok(
       result.manifest.ociSource,
       "expected oci source metadata in manifest",

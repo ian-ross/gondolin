@@ -129,7 +129,7 @@ test("build-config: rejects invalid runtimeDefaults.rootfsMode", () => {
   );
 });
 
-test("build-config: accepts oci rootfs configuration", () => {
+test("build-config: accepts alpine oci rootfs configuration", () => {
   const cfg = {
     arch: "x86_64",
     distro: "alpine",
@@ -149,6 +149,70 @@ test("build-config: accepts oci rootfs configuration", () => {
   assert.equal(parsed.oci?.runtime, "docker");
   assert.equal(parsed.oci?.platform, "linux/amd64");
   assert.equal(parsed.oci?.pullPolicy, "if-not-present");
+});
+
+test("build-config: accepts debian oci rootfs configuration", () => {
+  const cfg = {
+    arch: "x86_64",
+    distro: "debian",
+    oci: {
+      image: "docker.io/library/debian:bookworm-slim",
+      runtime: "docker",
+      platform: "linux/amd64",
+      pullPolicy: "if-not-present",
+    },
+  };
+
+  assert.equal(validateBuildConfig(cfg), true);
+
+  const parsed = parseBuildConfig(JSON.stringify(cfg));
+  assert.equal(parsed.distro, "debian");
+  assert.equal(parsed.oci?.image, "docker.io/library/debian:bookworm-slim");
+});
+
+test("build-config: rejects debian without oci rootfs", () => {
+  const invalid = {
+    arch: "x86_64",
+    distro: "debian",
+  };
+
+  assert.equal(validateBuildConfig(invalid), false);
+  assert.throws(
+    () => parseBuildConfig(JSON.stringify(invalid)),
+    /distro 'debian' requires oci\.image/,
+  );
+});
+
+test("build-config: rejects debian with distro-specific config blocks", () => {
+  const invalidAlpine = {
+    arch: "x86_64",
+    distro: "debian",
+    alpine: { version: "3.23.0" },
+    oci: {
+      image: "docker.io/library/debian:bookworm-slim",
+    },
+  };
+
+  assert.equal(validateBuildConfig(invalidAlpine), false);
+  assert.throws(
+    () => parseBuildConfig(JSON.stringify(invalidAlpine)),
+    /distro 'debian' does not accept an alpine config block/,
+  );
+
+  const invalidNixos = {
+    arch: "x86_64",
+    distro: "debian",
+    nixos: { channel: "nixos-24.05" },
+    oci: {
+      image: "docker.io/library/debian:bookworm-slim",
+    },
+  };
+
+  assert.equal(validateBuildConfig(invalidNixos), false);
+  assert.throws(
+    () => parseBuildConfig(JSON.stringify(invalidNixos)),
+    /distro 'debian' does not accept a nixos config block/,
+  );
 });
 
 test("build-config: rejects invalid oci rootfs configuration", () => {

@@ -8,6 +8,37 @@ import test from "node:test";
 import { buildAssets } from "../src/build/index.ts";
 import type { BuildConfig } from "../src/build/config.ts";
 
+test("builder: debian rejects alpine config block", async () => {
+  const outputDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "gondolin-assets-out-"),
+  );
+
+  try {
+    const config: BuildConfig = {
+      arch: "x86_64",
+      distro: "debian",
+      alpine: {
+        version: "3.23.0",
+      },
+      oci: {
+        image: "docker.io/library/debian:bookworm-slim",
+      },
+    };
+
+    await assert.rejects(
+      () =>
+        buildAssets(config, {
+          outputDir,
+          verbose: false,
+          skipBinaries: true,
+        }),
+      /Distro 'debian' does not accept an alpine config block/,
+    );
+  } finally {
+    fs.rmSync(outputDir, { recursive: true, force: true });
+  }
+});
+
 test("builder: oci rootfs rejects container.force", async () => {
   const outputDir = fs.mkdtempSync(
     path.join(os.tmpdir(), "gondolin-assets-out-"),

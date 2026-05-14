@@ -126,7 +126,7 @@ For custom kernels/initrds, provide an explicit `sandbox.imagePath` asset object
   - host -> guest access (`vm.enableSsh()`)
   - optional guest -> upstream allowlisted SSH egress (proxied, exec-oriented)
 - **Disk checkpoints (snapshots)** with resume support
-- **Custom image builds** (Alpine-based build pipeline, optional OCI rootfs source)
+- **Custom image builds** (native Alpine rootfs path plus OCI-backed rootfses, including Debian)
 - **Configurable DNS behavior** (`synthetic`, `trusted`, `open`), rootfs modes (`readonly`, `memory`, `cow`), and runtime rootfs sizing
 
 ## Documentation

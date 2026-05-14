@@ -28,9 +28,15 @@ in some ways a consequence of the lack of snapshotting.
 
 See [Custom Images](./custom-images.md).
 
-## Only Alpine
+## Debian Builds Are OCI-Backed
 
-The image builder currently only supports Alpine Linux.
+The image builder has a native Alpine rootfs path. Debian rootfs images are
+supported via OCI export only: set `"distro": "debian"` and provide `oci.image`.
+Native Debian debootstrap/APT image assembly is not implemented yet.
+
+Debian OCI builds use Debian userspace/rootfs contents with Gondolin's existing
+kernel/initramfs boot assets. As a result, `/etc/os-release` identifies Debian,
+while `uname -a` may still show Alpine kernel build metadata such as `#1-Alpine`.
 
 ## No HTTP/2 or HTTP/3 support
 

@@ -37,12 +37,12 @@ gondolin build --config host/examples/llm.json --output ./llm-assets
 GONDOLIN_GUEST_DIR=./llm-assets gondolin exec -- llm --help
 ```
 
-Use an OCI image (Docker Hub/GHCR/private registry) as the rootfs base:
+Use a Debian OCI image (Docker Hub/GHCR/private registry) as the rootfs base:
 
 ```json
 {
   "arch": "aarch64",
-  "distro": "alpine",
+  "distro": "debian",
   "oci": {
     "image": "docker.io/library/debian:bookworm-slim"
   }
@@ -52,6 +52,10 @@ Use an OCI image (Docker Hub/GHCR/private registry) as the rootfs base:
 ```bash
 gondolin build --config host/examples/oci-debian.json --output ./oci-assets
 ```
+
+Debian support is OCI-backed: Gondolin exports the Debian container filesystem
+as the rootfs and reuses the existing Gondolin boot asset pipeline. Native
+Debian debootstrap/APT image assembly is not implemented yet.
 
 ## Build Requirements
 
@@ -145,7 +149,7 @@ The file has the following structure:
 | Field | Type | Description |
 |-------|------|-------------|
 | `arch` | `"aarch64"` \| `"x86_64"` | Target architecture |
-| `distro` | `"alpine"` | Distribution (only Alpine is currently supported) |
+| `distro` | `"alpine"` \| `"debian"` | Guest rootfs distribution (`"debian"` requires `oci.image`) |
 | `env` | object \| string[] | Default environment variables baked into the guest image |
 | `alpine` | object | Alpine-specific configuration |
 | `oci` | object | OCI rootfs source (uses exported container filesystem as rootfs base) |
@@ -200,7 +204,8 @@ Because `env` is stored in the image, **do not put real secrets here**.
 ### OCI Support
 
 When `oci` is set, Gondolin exports the OCI image filesystem and uses it as the rootfs base.
-The Alpine minirootfs is still used for initramfs generation and kernel packaging.
+For `distro: "debian"`, `oci.image` is required and should point at a Debian or Debian-derived image.
+The current OCI path still reuses Gondolin's existing boot asset pipeline for initramfs generation and kernel packaging.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -211,25 +216,31 @@ The Alpine minirootfs is still used for initramfs generation and kernel packagin
 
 Notes:
 
-- `alpine.rootfsPackages` is ignored when `oci` is set
-- `alpine.initramfsPackages` automatically includes the configured kernel package when `oci` is set
+- `distro: "debian"` requires `oci.image`
+- `distro: "debian"` does not accept an `alpine` config block; boot defaults are internal
+- `alpine.rootfsPackages` is ignored when `oci` is set for Alpine builds
+- `alpine.initramfsPackages` automatically includes the configured kernel package when `oci` is set for Alpine builds
 - The exported rootfs must contain `/bin/sh`, or provide a custom `init.rootfsInit`
 - `container.force=true` is currently not supported together with `oci`
 
 OCI support swaps the **root filesystem contents**, not the whole image build pipeline.
-Gondolin still assembles boot artifacts from Alpine components, and then layers the
-exported OCI filesystem on top as `rootfs.ext4`.
+Gondolin still assembles boot artifacts with its existing boot pipeline, and then
+layers the exported OCI filesystem on top as `rootfs.ext4`.
 
 In practice, the build is split into two parts:
 
-- **Boot layer (still Alpine-based):** kernel package selection, kernel image, and initramfs generation
+- **Boot layer:** kernel package selection, kernel image, and initramfs generation
 - **Rootfs layer (from OCI):** userspace filesystem exported from `oci.image` (Debian, Ubuntu, etc.)
 
-That is why OCI examples still use:
+Use `"distro": "debian"` for Debian or Debian-derived OCI rootfs images so the
+build config and `manifest.json` identify the guest userspace correctly.
 
-- `"distro": "alpine"`
-- `alpine.kernelPackage` / `alpine.kernelImage`
-- `alpine.initramfsPackages`
+For Debian OCI builds, the running VM has Debian userspace but still boots with
+Gondolin's existing kernel/initramfs assets. Commands that inspect userspace,
+such as `cat /etc/os-release`, should report Debian. Commands that inspect the
+running kernel, such as `uname -a`, report the boot kernel provenance and may
+include Alpine kernel build metadata such as `#1-Alpine`. This is expected and
+does not mean the root filesystem is Alpine.
 
 ### Rootfs Configuration
 

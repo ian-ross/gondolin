@@ -15,7 +15,7 @@ export function isRootfsMode(value: unknown): value is RootfsMode {
 
 export type Architecture = "aarch64" | "x86_64";
 
-export type Distro = "alpine" | "nixos";
+export type Distro = "alpine" | "debian" | "nixos";
 
 export type ContainerRuntime = "docker" | "podman";
 
@@ -293,7 +293,11 @@ export function validateBuildConfig(config: unknown): config is BuildConfig {
     return false;
   }
 
-  if (cfg.distro !== "alpine" && cfg.distro !== "nixos") {
+  if (
+    cfg.distro !== "alpine" &&
+    cfg.distro !== "debian" &&
+    cfg.distro !== "nixos"
+  ) {
     return false;
   }
 
@@ -442,6 +446,15 @@ export function validateBuildConfig(config: unknown): config is BuildConfig {
     }
   }
 
+  if (cfg.distro === "debian") {
+    if (cfg.oci === undefined) {
+      return false;
+    }
+    if (cfg.alpine !== undefined || cfg.nixos !== undefined) {
+      return false;
+    }
+  }
+
   if (cfg.distro === "nixos") {
     if (cfg.nixos === undefined) {
       return false;
@@ -470,6 +483,27 @@ export function validateBuildConfig(config: unknown): config is BuildConfig {
 export function parseBuildConfig(json: string): BuildConfig {
   const parsed = JSON.parse(json);
   if (!validateBuildConfig(parsed)) {
+    if (isRecord(parsed) && parsed.distro === "debian") {
+      if (
+        !isRecord(parsed.oci) ||
+        typeof parsed.oci.image !== "string" ||
+        parsed.oci.image.trim() === ""
+      ) {
+        throw new Error(
+          "Invalid build configuration: distro 'debian' requires oci.image",
+        );
+      }
+      if (parsed.alpine !== undefined) {
+        throw new Error(
+          "Invalid build configuration: distro 'debian' does not accept an alpine config block",
+        );
+      }
+      if (parsed.nixos !== undefined) {
+        throw new Error(
+          "Invalid build configuration: distro 'debian' does not accept a nixos config block",
+        );
+      }
+    }
     throw new Error("Invalid build configuration");
   }
   return parsed;

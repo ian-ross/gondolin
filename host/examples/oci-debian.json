@@ -1,6 +1,6 @@
 {
   "arch": "aarch64",
-  "distro": "alpine",
+  "distro": "debian",
   "oci": {
     "image": "docker.io/library/debian:bookworm-slim",
     "pullPolicy": "if-not-present"
